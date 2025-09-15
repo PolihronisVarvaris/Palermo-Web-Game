@@ -1,0 +1,159 @@
+.palermo-container {
+  font-family: Arial, sans-serif;
+  background: linear-gradient(to bottom, #181815, #771d26, #181815);
+  color: white;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* Top header */
+header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 10px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  text-align: center;
+}
+
+.btn-reset {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: none;
+  background-color: #522a2b;
+  color: #dfcea0;
+  cursor: pointer;
+}
+
+/* Layout container for game stages and cards */
+.game-layout {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+}
+
+/* Left box (setup / players / roles) */
+.left-box {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  padding: 15px;
+  min-width: 280px;
+  overflow-y: auto;
+}
+
+/* Center card display */
+.center-card {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 10px;
+}
+
+/* Right section for future content */
+.right-section {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  padding: 15px;
+  min-width: 200px;
+}
+
+/* Card flip */
+.card-wrap {
+  perspective: 1000px;
+  display: inline-block;
+  margin: 10px auto;
+}
+
+.card {
+  transform-style: preserve-3d;
+  transition: transform 0.7s;
+  position: relative;
+}
+
+.card.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  position: absolute;
+  backface-visibility: hidden;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+
+.card-face.front {
+  transform: rotateY(180deg);
+}
+
+/* Buttons & Inputs */
+input[type="number"], input[type="text"] {
+  padding: 4px 6px;
+  border-radius: 5px;
+  border: 1px solid #aaa;
+  width: 80px;
+}
+
+button {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  margin-top: 5px;
+}
+
+button:disabled {
+  background-color: gray;
+  cursor: not-allowed;
+}
+
+/* Lists */
+ul, ol {
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 10px;
+}
+
+/* Mobile responsive layout */
+@media screen and (max-width: 768px) {
+  .game-layout {
+    flex-direction: column;
+  }
+
+  .left-box, .center-card, .right-section {
+    flex: none;
+    width: 100%;
+    padding: 0.5rem;
+  }
+
+  .left-box {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .center-card {
+    margin-top: 20px;
+    justify-content: center;
+  }
+}
+
+
