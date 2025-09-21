@@ -23,8 +23,8 @@
 /* actual card visual */
 .deck > div {
   will-change: transform, opacity;
-  width: min(48vh, 320px);
-  height: calc(min(48vh, 320px) * 1.6); /* keep portrait ratio ~1.6 */
+  width: min(41vh, 320px);
+  height: calc(min(41vh, 320px) * 1.6); /* keep portrait ratio ~1.6 */
   border-radius: 12px;
   box-shadow: 0 12.5px 100px -10px rgba(50, 50, 73, 0.4),
     0 10px 10px -10px rgba(50, 50, 73, 0.3);

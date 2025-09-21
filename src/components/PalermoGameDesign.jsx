@@ -754,11 +754,16 @@ export default function PalermoGameDesign() {
         {/* CENTER: card preview */}
         <div className="center-card">
           {showDeck ? (
-            <Deck players={players}/>  
+            <Deck players={players} />  
           ) : stage === 3 && players[currentIndex] ? (
-            <div onClick={() => handleCardClick(currentIndex)}>
-              <CardFlip player={players[currentIndex]} />
-            </div>
+            <CardFlip
+              flipped={players[currentIndex].flipped}
+              backImage={ROLE_IMAGES.back}
+              frontImage={
+                ROLE_IMAGES[players[currentIndex].role] || ROLE_IMAGES.back
+              }
+              onClick={() => handleCardClick(currentIndex)}
+            />
           ) : (
             <div style={{ textAlign: "center", color: "#ccc" }}>
               <div style={{ fontSize: 18, marginBottom: 8 }}>Card preview</div>
@@ -769,29 +774,43 @@ export default function PalermoGameDesign() {
           )}
         </div>
 
+
         {/* RIGHT: role info (only for the currently selected player when revealed) */}
         <div className="right-section">
           {stage === 3 && players[currentIndex] ? (
             players[currentIndex].flipped ? (
               <>
-                <h3 style={{ color: players[currentIndex].color }}>{players[currentIndex].role}</h3>
+                <h3 style={{ color: players[currentIndex].color }}>
+                  {roleDescriptions[players[currentIndex].role]?.title || players[currentIndex].role}
+                </h3>
                 <p><strong>Alignment:</strong> {players[currentIndex].alignment}</p>
-                <p><strong>Reveal count:</strong> {players[currentIndex].revealCount}</p>
+                <p>
+                  <strong>Objective:</strong>{" "}
+                  {roleDescriptions[players[currentIndex].role]?.objective || "—"}
+                </p>
                 <div style={{ marginTop: 8 }}>
                   <p><strong>Abilities / Notes</strong></p>
                   <ul>
-                    {(roleDescriptions[players[currentIndex].role]?.abilities || []).map((a, idx) => <li key={idx}>{a}</li>)}
+                    {(roleDescriptions[players[currentIndex].role]?.abilities || []).map((a, idx) => (
+                      <li key={idx}>{a}</li>
+                    ))}
                   </ul>
                 </div>
               </>
             ) : (
-              <div style={{ color: "#ccc" }}>Select player and press Role to view their card. Then click the card to flip.</div>
+              <div style={{ color: "#ccc" }}>
+                Select player and press Role to view their card. Then click the card to flip.
+              </div>
             )
           ) : (
-            <div style={{ color: "#ccc" }}>Role information will appear here during the game when a player's card is revealed.</div>
+            <div style={{ color: "#ccc" }}>
+              Role information will appear here during the game when a player's card is revealed.
+            </div>
           )}
         </div>
+
       </div>
     </div>
   );
 }
+
