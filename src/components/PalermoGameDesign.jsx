@@ -1,11 +1,12 @@
-import React, { useState } from "react";
-import './PalermoGameDesign.css';
+import React, { useEffect, useState } from "react";
+import Deck from "./Deck";
+import CardFlip from "./CardFlip.jsx"; 
+import { ROLE_IMAGES } from "./roleImages";
+import "./PalermoGameDesign.css";
 
-export default function PalermoGameDesign() {
-  const [stage, setStage] = useState(1);
-  const [playerCount, setPlayerCount] = useState(4);
-  const rolesList = [
-    "Associate",
+
+const DEFAULT_ROLES = [
+  "Associate",
     "Author",
     "Black_Killer",
     "Bulletproof",
@@ -37,18 +38,10 @@ export default function PalermoGameDesign() {
     "Thief",
     "Tonguebreaker",
     "Witch"
-  ];
+];
 
-  const [roleCounts, setRoleCounts] = useState(
-    Object.fromEntries(rolesList.map(r => [r, { count: 0, color: "white" }]))
-  );
-  const [names, setNames] = useState([]);
-  const [currentName, setCurrentName] = useState("");
-  const [players, setPlayers] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [winner, setWinner] = useState(null);
 
-  const roleDescriptions = {
+const DEFAULT_ROLE_DESCRIPTIONS = {
   Associate: {
     title: "💋 Associate (Πουτάνα)",
     objective: "Assist the Mafia without being directly involved.",
@@ -70,7 +63,7 @@ export default function PalermoGameDesign() {
     ]
   },
   Black_Killer: {
-    title: "🕴️Black Killer (Μαύρος Δολοφόνος)",
+    title: "Black Killer (Μαύρος Δολοφόνος)",
     objective: "Lead the Mafia and choose who dies.",
     alignment: "Evil (Mafia Team Victory)",
     abilities: [
@@ -377,290 +370,428 @@ export default function PalermoGameDesign() {
   }
 };
 
+export default function PalermoGameDesign() {
+  const [lastPreviewedRole, setLastPreviewedRole] = useState(null);
+  const [stage, setStage] = useState(1);
+  const [playerCount, setPlayerCount] = useState(4);
 
+  // roleCounts hold count and alignmentColor (Light/Lone/Dark stored as 'color' & 'alignment')
+  const [rolesList] = useState(DEFAULT_ROLES);
+  const [roleCounts, setRoleCounts] = useState(
+    Object.fromEntries(
+      DEFAULT_ROLES.map((r) => [r, { count: 0, alignment: "Light", color: "white" }])
+    )
+  );
+
+  // players' names (persisted across reset)
+  const [names, setNames] = useState([]);
+  const [currentName, setCurrentName] = useState("");
+
+  // players in game (created on startGame)
+  const [players, setPlayers] = useState([]);
+  const [showDeck, setShowDeck] = useState(false)
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // winner state
+  const [winner, setWinner] = useState(null);
+
+  // role descriptions (alignment is derived from roleCounts alignment selection)
+  const [roleDescriptions] = useState(DEFAULT_ROLE_DESCRIPTIONS);
+
+  // totals
   const totalAssigned = Object.values(roleCounts).reduce((s, v) => s + Number(v.count || 0), 0);
 
-  // Helpers
-  const toggleRoleCheckbox = role => {
-    setRoleCounts(prev => ({
+  // --- Setup helpers ---
+  function toggleRoleCheckbox(role) {
+    setRoleCounts((prev) => ({
       ...prev,
-      [role]: { ...prev[role], count: prev[role].count > 0 ? 0 : 1 }
+      [role]: { 
+        ...prev[role], 
+        count: prev[role].count > 0 ? 0 : 1 
+      }
     }));
-  };
 
-  const setRoleNumber = (role, val) => {
-    setRoleCounts(prev => ({
+    // update last previewed role
+    setLastPreviewedRole(role);
+  }
+
+  function setRoleNumber(role, val) {
+    setRoleCounts((prev) => ({
       ...prev,
       [role]: { ...prev[role], count: Math.max(0, Number(val || 0)) }
     }));
-  };
-
-  const setRoleColor = (role, color) => {
-    setRoleCounts(prev => ({
+  }
+  function setRoleAlignment(role, alignment) {
+    // alignment: "Light" | "Lone" | "Dark"
+    const color = alignment === "Light" ? "white" : alignment === "Dark" ? "black" : "red";
+    setRoleCounts((prev) => ({
       ...prev,
-      [role]: { ...prev[role], color }
+      [role]: { ...prev[role], alignment, color }
     }));
-  };
+  }
+  function canProceedSetup() {
+    return playerCount >= 3 && totalAssigned <= playerCount;
+  }
+  function handleNextFromSetup() {
+    if (!canProceedSetup()) {
+      alert("Check that player count >=3 and total assigned roles <= players.");
+      return;
+    }
+    setStage(2);
+  }
 
-  const canProceedSetup = () => playerCount >= 3 && totalAssigned <= playerCount;
-  const handleNextFromSetup = () => { 
-    if (!canProceedSetup()) { 
-      alert("Check that total roles <= players and player count >=3"); 
-      return; 
-    } 
-    setStage(2); 
-  };
+  // --- Add names ---
+  function addName() {
+    const t = currentName.trim();
+    if (!t) return;
+    if (names.length >= playerCount) return;
+    setNames((p) => [...p, t]);
+    setCurrentName("");
+  }
 
-  const addName = () => { 
-    const t = currentName.trim(); 
-    if (!t || names.length >= playerCount) return; 
-    setNames(prev => [...prev, t]); 
-    setCurrentName(""); 
-  };
-
-  const startGame = () => {
-    if (names.length !== playerCount) { 
-      alert(`Please add all ${playerCount} players first.`); 
-      return; 
+  // --- Start game ---
+  function startGame() {
+    if (names.length !== playerCount) {
+      alert(`Please add all ${playerCount} players first.`);
+      return;
     }
     const pool = [];
-    Object.entries(roleCounts).forEach(([role, data]) => { 
-      for (let i = 0; i < data.count; i++) pool.push({ role, color: data.color }); 
+    Object.entries(roleCounts).forEach(([role, data]) => {
+      for (let i = 0; i < (Number(data.count) || 0); i++) {
+        pool.push({ role, color: data.color || (data.alignment === "Dark" ? "black" : data.alignment === "Lone" ? "red" : "white") , alignment: data.alignment });
+      }
     });
-    while (pool.length < playerCount) pool.push({ role: "Peasant", color: "white" });
+    // auto-fill villagers
+    while (pool.length < playerCount) pool.push({ role: "Villager", color: "white", alignment: "Light" });
+
     const shuffled = pool.sort(() => Math.random() - 0.5);
-    setPlayers(names.map((n,i) => ({
+    const created = names.map((n, i) => ({
       name: n,
       role: shuffled[i].role,
       color: shuffled[i].color,
-      revealed: false,
+      alignment: shuffled[i].alignment,
+      flipped: false,    // visual state of card (front/back)
+      canFlip: false,    // whether Role button enabled flipping
       revealCount: 0,
       alive: true
-    }))); 
-    setStage(3);
-    setWinner(null);
-  };
-
-  const handleFlip = index => {
-    setPlayers(prev => prev.map((p,i) => {
-      if (i !== index) return p;
-      return {
-        ...p,
-        revealed: !p.revealed,
-        revealCount: !p.revealed ? p.revealCount + 1 : p.revealCount
-      };
     }));
-  };
+    setPlayers(created);
+    setStage(3);
+    setCurrentIndex(0);
+    setWinner(null);
+  }
 
-  const toggleAlive = index => {
-    setPlayers(prev => {
-      const updated = prev.map((p,i) => i === index ? { ...p, alive: !p.alive } : p);
+  // --- Flip/Role logic ---
+  // Role button toggles whether player can flip. Flips (clicking card) only work if canFlip is true.
+  function toggleRoleEnable(index) {
+    setPlayers((prev) =>
+      prev.map((p, i) => {
+        if (i !== index) return p;
+        // toggling canFlip; when turning off, also ensure flipped false (hide front)
+        if (p.canFlip) {
+          return { ...p, canFlip: false, flipped: false };
+        } else {
+          return { ...p, canFlip: true };
+        }
+      })
+    );
+  }
+
+  function handleCardClick(index) {
+    setPlayers((prev) =>
+      prev.map((p, i) => {
+        if (i !== index) return p;
+        if (!p.canFlip) return p; // if flipping not allowed, do nothing
+        // toggling flipped state; if flipping to front, increment revealCount
+        if (!p.flipped) {
+          return { ...p, flipped: true, revealCount: (p.revealCount || 0) + 1 };
+        } else {
+          return { ...p, flipped: false };
+        }
+      })
+    );
+  }
+
+  // Kill/revive
+  function toggleAlive(index) {
+    setPlayers((prev) => {
+      const updated = prev.map((p, i) => (i === index ? { ...p, alive: !p.alive } : p));
       checkWinner(updated);
       return updated;
     });
-  };
+  }
 
-  const checkWinner = (players) => {
-    const alive = players.filter(p => p.alive);
-    const mafiaAlive = alive.filter(p => p.role === "Mafia").length;
-    const othersAlive = alive.filter(p => p.role !== "Mafia").length;
-
+  // --- Winner logic & alert ---
+  function checkWinner(playersArray) {
+    // Simple rule: if no mafia alive -> town wins. If mafia >= others -> mafia wins.
+    const alive = playersArray.filter((p) => p.alive);
+    const mafiaAlive = alive.filter((p) => p.role === "Mafia").length;
+    const othersAlive = alive.filter((p) => p.role !== "Mafia").length;
     if (mafiaAlive === 0) {
       setWinner("Town wins 🎉");
     } else if (mafiaAlive >= othersAlive) {
       setWinner("Mafia wins 🩸");
+    } else {
+      setWinner(null);
     }
-  };
+  }
 
-  const resetAll = () => { 
-    setStage(1); 
-    setPlayerCount(4); 
-    setRoleCounts(Object.fromEntries(rolesList.map(r=>[r,{ count: 0, color: "white" }]))); 
-    setNames([]); 
-    setPlayers([]); 
+  // show alert when winner changes to non-null
+  useEffect(() => {
+    if (winner) {
+      // small timeout to allow UI update before blocking alert
+      setTimeout(() => {
+        alert(winner);
+      }, 60);
+    }
+  }, [winner]);
+
+  // --- Reset behavior ---
+  // resetKeep: return to setup but keep names & roleCounts so user can edit them
+  function resetKeep() {
+    setStage(1);
+    setPlayers([]);
     setCurrentIndex(0);
     setWinner(null);
-  };
+    // keep names & roleCounts unchanged so user can edit
+  }
+  // hard reset - clear everything
+  function hardReset() {
+    setStage(1);
+    setPlayers([]);
+    setNames([]);
+    setRoleCounts(
+      Object.fromEntries(DEFAULT_ROLES.map((r) => [r, { count: 0, alignment: "Light", color: "white" }]))
+    );
+    setCurrentIndex(0);
+    setWinner(null);
+  }
+
+  // Preload images for current player to avoid flicker
+  useEffect(() => {
+    if (!players || players.length === 0) return;
+    const p = players[currentIndex];
+    if (!p) return;
+    
+    const front = new Image();
+    front.src = ROLE_IMAGES[p.role] || ROLE_IMAGES.back;
+    const back = new Image();
+    back.src = ROLE_IMAGES.back;
+  }, [currentIndex, players]);
+
+  // When switching currentIndex reset flipped state for others (keep canFlip false for others)
+  useEffect(() => {
+    setPlayers((prev) =>
+      prev.map((p, i) => 
+        i === currentIndex 
+          ? p 
+          : { ...p, flipped: false } // only close others, keep current as-is
+      )
+    );
+  }, [currentIndex]);
+
+  // --- UI helpers for role description shown during setup: chosen role (left box) ---
 
   return (
     <div className="palermo-container">
       <header>
-        <button onClick={resetAll} className="btn-reset">Reset</button>
+        <h1>Palermo — Mafia</h1>
+        <div>
+          <button className="btn-reset" onClick={resetKeep}>Reset (keep names & roles)</button>
+          <button className="btn-reset" style={{ marginLeft: 8 }} onClick={hardReset}>Hard Reset</button>
+        </div>
       </header>
 
-      {winner && (
-        <div style={{ textAlign: "center", fontSize: "1.5rem", fontWeight: "bold", marginBottom: "10px" }}>
-          {winner}
-        </div>
-      )}
-
       <div className="game-layout">
-        {/* Left Box */}
+        {/* LEFT: during stage1 show role descriptions as you configure; during stage3 show players list */}
         <div className="left-box">
-          {stage===1 && (
-            <div className="setup-stage">
-              <label>Number of Players: </label>
-              <input type="number" min="3" value={playerCount} onChange={e=>setPlayerCount(Math.max(3, Number(e.target.value||3)))} />
-              <h3>Roles Configuration:</h3>
-              {rolesList.map(role=>(
-                <div key={role} className="role-row">
-                  <input type="checkbox" checked={roleCounts[role].count>0} onChange={()=>toggleRoleCheckbox(role)} />
-                  <span>{role}</span>
-                  <input type="number" min="0" value={roleCounts[role].count} onChange={e=>setRoleNumber(role,e.target.value)} />
-                  <select value={roleCounts[role].color} onChange={e => setRoleColor(role, e.target.value)}>
-                    <option value="white">⚪ Light </option>
-                    <option value="black">⚫ Dark </option>
-                    <option value="red">🔴 Lone </option>
-                  </select>
+          {stage === 1 && (
+            <>
+              <h3>Setup Roles</h3>
+              <div style={{ marginBottom: 8 }}>
+                <label>Number of players: </label>
+                <input
+                  type="number"
+                  min={3}
+                  value={playerCount}
+                  onChange={(e) => setPlayerCount(Math.max(3, Number(e.target.value || 3)))}
+                />
+                <button style={{ marginLeft: 8 }} onClick={() => { if (canProceedSetup()) handleNextFromSetup(); else alert("Fix roles/players"); }}>
+                  Next
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                {rolesList.map((role) => {
+                  const data = roleCounts[role];
+                  return (
+                    <div key={role} style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={Number(data.count || 0) > 0}
+                          onChange={() => toggleRoleCheckbox(role)}
+                        />
+                        <strong>{role}</strong>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="number"
+                          min={0}
+                          value={data.count}
+                          onChange={(e) => setRoleNumber(role, e.target.value)}
+                          style={{ width: 70 }}
+                        />
+                        <select value={data.alignment} onChange={(e) => setRoleAlignment(role, e.target.value)}>
+                          <option value="Light">Light</option>
+                          <option value="Lone">Lone</option>
+                          <option value="Dark">Dark</option>
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <strong>Total:</strong> {totalAssigned} / {playerCount}
+              </div>
+
+              {/* show description for first checked role or a message */}
+              <div style={{ marginTop: 12, padding: 10, background: "rgba(0,0,0,0.25)", borderRadius: 8 }}>
+                <h4 style={{ marginTop: 0 }}>Role preview</h4>
+                {lastPreviewedRole ? (() => {
+                  const data = roleCounts[lastPreviewedRole];
+                  const desc = roleDescriptions[lastPreviewedRole] || DEFAULT_ROLE_DESCRIPTIONS[lastPreviewedRole];
+                  const alignment = data.alignment || desc.alignment || "Light";
+                  return (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <strong>{desc.title}</strong>
+                        <span style={{ color: alignment === "Dark" ? "#ff6b6b" : alignment === "Lone" ? "#ffcc00" : "#fff" }}>{alignment}</span>
+                      </div>
+                      <p style={{ margin: "8px 0" }}><strong>Objective:</strong> {desc.objective}</p>
+                      <p style={{ margin: "8px 0" }}><strong>Abilities:</strong></p>
+                      <ul>
+                        {(desc.abilities || []).map((a, i) => <li key={i}>{a}</li>)}
+                      </ul>
+                    </div>
+                  );
+                })() : (
+                  <div className="small-muted">Toggle a role to preview its description and choose alignment.</div>
+                )}
+              </div>
+            </>
+          )}
+
+          {stage === 2 && (
+            <>
+              <h3>Add players</h3>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  value={currentName}
+                  onChange={(e) => setCurrentName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addName()}
+                  placeholder={`Player ${names.length + 1}`}
+                />
+                <button onClick={addName}>Add</button>
+              </div>
+              <div style={{ marginTop: 8 }}>{names.length}/{playerCount}</div>
+              <ol style={{ marginTop: 8 }}>
+                {names.map((n, i) => <li key={i}>{n}</li>)}
+              </ol>
+              <div style={{ marginTop: 10 }}>
+                <button disabled={names.length !== playerCount} onClick={startGame}>Start Game</button>
+              </div>
+            </>
+          )}
+
+          {stage === 3 && (
+            <>
+              <h3>Players</h3>
+              <div style={{ marginTop: 8 }}>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {players.map((p, i) => (
+                    <li key={i} style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <div style={{ fontWeight: "700" }}>{i+1}.</div>
+                        <div style={{ color: p.alive ? "inherit" : "#999", textDecoration: p.alive ? "none" : "line-through" }}>{p.name}</div>
+                        {p.revealCount > 0 && <div style={{ fontSize: 12, color: "#ccd" }}>{`(Seen ${p.revealCount})`}</div>}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          onClick={() => { setCurrentIndex(i); }}
+                          className={currentIndex === i ? "selected-player" : ""}
+                        >
+                          Select
+                        </button>
+
+                        <button onClick={() => toggleRoleEnable(i)}>
+                          {players[i].canFlip ? "Disable Role" : "Role"}
+                        </button>
+
+                        <button onClick={() => toggleAlive(i)} style={{ backgroundColor: p.alive ? "#b22222" : "#2a8bf2" }}>
+                          {p.alive ? "Kill" : "Revive"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div style={{ marginTop: 10 }}>
+                  <button style={{ marginLeft: 8 }}onClick={() => setShowDeck((prev) => !prev)}>{showDeck ? "Hide Deck" : "Show Deck"}</button>
+                  <button onClick={() => { setPlayers((prev)=>prev.map(p=>({ ...p, flipped: false, canFlip: false }))); setCurrentIndex(0); }}>Hide all</button>
                 </div>
-              ))}
-              <div>Total assigned: {totalAssigned} / {playerCount}</div>
-              <button onClick={handleNextFromSetup} disabled={!canProceedSetup()}>Next</button>
-            </div>
-          )}
-
-          {stage===2 && (
-            <div className="names-stage">
-              <h2>Add Players</h2>
-              <input value={currentName} onChange={e=>setCurrentName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter') addName();}} placeholder={`Player ${names.length+1}`} />
-              <button onClick={addName}>Add</button>
-              <div>{names.length}/{playerCount}</div>
-              <ol>{names.map((n,i)=><li key={i}>{n}</li>)}</ol>
-              <button onClick={startGame} disabled={names.length!==playerCount}>Start Game</button>
-            </div>
-          )}
-
-          {stage===3 && (
-            <div className="reveal-stage">
-              <h2>Reveal Roles</h2>
-              <ul>
-                {players.map((p,i)=>(
-                  <li key={i} style={{ color: p.alive ? "inherit" : "gray", textDecoration: p.alive ? "none" : "line-through" }}>
-                    {i+1}. {p.name} {p.revealCount > 0 && `(Checked ${p.revealCount}) `}
-                    <button onClick={()=>setCurrentIndex(i)}>Select</button>
-                    <button onClick={()=>toggleAlive(i)}>{p.alive ? "Kill" : "Revive"}</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <strong>Winner:</strong> {winner || "—"}
+              </div>
+            </>
           )}
         </div>
 
-        {/* Center Card */}
+        {/* CENTER: card preview */}
         <div className="center-card">
-          {stage===3 && players.length>0 && (
-            <BigCard
-              players={players}
-              currentIndex={currentIndex}
-              cardRatio={1497/897}
-              maxWidth={360}
-              onFlip={handleFlip}
-            />
+          {showDeck ? (
+            <Deck players={players}/>  
+          ) : stage === 3 && players[currentIndex] ? (
+            <div onClick={() => handleCardClick(currentIndex)}>
+              <CardFlip player={players[currentIndex]} />
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", color: "#ccc" }}>
+              <div style={{ fontSize: 18, marginBottom: 8 }}>Card preview</div>
+              <div className="small-muted">
+                Cards flip only during the game. Select a player and press Role to enable flipping.
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Right Section */}
+        {/* RIGHT: role info (only for the currently selected player when revealed) */}
         <div className="right-section">
-          {stage === 3 && players[currentIndex] && players[currentIndex].revealed && (
-            (() => {
-              const role = players[currentIndex].role;
-              const color = players[currentIndex].color || "black";
-              const info = roleDescriptions[role];
-              if (!info) return null;
-              return (
-                <div>
-                  <h2 style={{ color }}>{info.title}</h2>
-                  <p><strong>Objective:</strong> {info.objective}</p>
-                  <p><strong>Alignment:</strong> {info.alignment}</p>
-                  <p><strong>Abilities:</strong></p>
+          {stage === 3 && players[currentIndex] ? (
+            players[currentIndex].flipped ? (
+              <>
+                <h3 style={{ color: players[currentIndex].color }}>{players[currentIndex].role}</h3>
+                <p><strong>Alignment:</strong> {players[currentIndex].alignment}</p>
+                <p><strong>Reveal count:</strong> {players[currentIndex].revealCount}</p>
+                <div style={{ marginTop: 8 }}>
+                  <p><strong>Abilities / Notes</strong></p>
                   <ul>
-                    {info.abilities.map((a, i) => <li key={i}>{a}</li>)}
+                    {(roleDescriptions[players[currentIndex].role]?.abilities || []).map((a, idx) => <li key={idx}>{a}</li>)}
                   </ul>
                 </div>
-              );
-            })()
+              </>
+            ) : (
+              <div style={{ color: "#ccc" }}>Select player and press Role to view their card. Then click the card to flip.</div>
+            )
+          ) : (
+            <div style={{ color: "#ccc" }}>Role information will appear here during the game when a player's card is revealed.</div>
           )}
-        </div>
-      </div>
-    </div>    
-  );
-}
-
-
-function BigCard({ players, currentIndex, cardRatio, maxWidth, onFlip }) {
-  const player = players[currentIndex];
-  if (!player) return null;
-
-  const w = Math.min(maxWidth, 360);
-  const h = w * cardRatio;
-
-  const backImage = "/assets/1.png"; // back
-  const roleImages = {
-    Associate: "/assets/75.png",
-    Author: "/assets/51.png",
-    Black_Killer: "/assets/78.png",
-    Bulletproof: "/assets/84.png",
-    Cannibal: "/assets/12.png",
-    Cop: "/assets/69.png",
-    Day_Bomber: "/assets/87.png",
-    Fog: "/assets/21.png",
-    Healer: "/assets/48.png",
-    Heretic: "/assets/24.png",
-    Jester: "/assets/96.png",
-    King: "/assets/63.png",
-    Lawyer: "/assets/9.png",
-    Librarian: "/assets/54.png",
-    Lovers: "/assets/99.png",
-    Messenger: "/assets/36.png",
-    Mother: "/assets/93.png",
-    Muse: "/assets/66.png",
-    Night_Bomber: "/assets/90.png",
-    Nightbringer: "/assets/18.png",
-    Oracle: "/assets/30.png",
-    Painter: "/assets/27.png",
-    Peasant: "/assets/42.png",
-    Poisoner: "/assets/15.png",
-    Reader: "/assets/45.png",
-    Red_Killer: "/assets/81.png",
-    Reflector: "/assets/57.png",
-    Spy: "/assets/3.png",
-    Stripper: "/assets/60.png",
-    Thief: "/assets/6.png",
-    Tonguebreaker: "/assets/33.png",
-    Witch: "/assets/72.png"
-  };
-
-  const frontImage = roleImages[player.role] || backImage;
-
-  return (
-    <div style={{ width: w, cursor: "pointer" }} className="card-wrap" onClick={() => onFlip(currentIndex)}>
-      <div className={`card ${player.revealed ? "is-flipped" : ""}`} style={{ width: w, height: h }}>
-        <img
-          src={backImage}
-          alt="back"
-          className="card-face back rounded-lg shadow-2xl"
-          style={{ width: w, height: h }}
-        />
-        <div
-          className="card-face front rounded-lg shadow-2xl"
-          style={{
-            width: w,
-            height: h,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
-          }}
-        >
-          <img
-            src={frontImage}
-            alt="front"
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: 12 }}
-          />
         </div>
       </div>
     </div>
   );
 }
-
-

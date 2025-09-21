@@ -1,0 +1,45 @@
+/* src/components/Deck.css */
+
+.deck-wrapper {
+  position: relative;        /* important: makes children absolute inside this box */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;          /* clip flung cards so they don't create scrollbars */
+  touch-action: none;
+}
+
+.deck {
+  position: absolute;
+  will-change: transform;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* inner card controls pointer-events via spring */
+}
+
+/* actual card visual */
+.deck > div {
+  will-change: transform, opacity;
+  width: min(48vh, 320px);
+  height: calc(min(48vh, 320px) * 1.6); /* keep portrait ratio ~1.6 */
+  border-radius: 12px;
+  box-shadow: 0 12.5px 100px -10px rgba(50, 50, 73, 0.4),
+    0 10px 10px -10px rgba(50, 50, 73, 0.3);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  cursor: grab;
+}
+
+/* mobile responsiveness: card scales to viewport width */
+@media (max-width: 768px) {
+  .deck > div {
+    width: 60vw;                  /* smaller width on mobile */
+    height: calc(60vw * 1.6);     /* keep portrait ratio */
+    max-width: 220px;             /* optional cap */
+    max-height: 352px;            /* optional cap */
+  }
+}
